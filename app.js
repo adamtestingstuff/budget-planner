@@ -1,429 +1,533 @@
-:root{
-  --bg0:#050a15;
-  --bg1:#070f22;
+/* Budget Planner — LocalStorage month/year buckets + calendar + compare */
 
-  --card: rgba(255,255,255,0.06);
-  --stroke: rgba(255,255,255,0.12);
+const STORAGE_KEY = "bp_v1_data";
 
-  --text: rgba(255,255,255,0.92);
-  --muted: rgba(255,255,255,0.62);
+const monthNames = [
+  "January","February","March","April","May","June",
+  "July","August","September","October","November","December"
+];
 
-  --midnight:#0b1b3a;
-  --midnight2:#0e2a66;
+const CATEGORY_COLORS = {
+  "Rent": "#66a7ff",
+  "Mortgage": "#ff4fb8",
+  "HOA": "#9b8cff",
+  "Home Insurance": "#4de1c1",
+  "Property Tax": "#ffd166",
+  "Maintenance/Repairs": "#ff6b7d",
 
-  --accent:#66a7ff;
-  --good:#4de1c1;
-  --bad:#ff6b7d;
+  "Car Payment": "#9b8cff",
+  "Auto Insurance": "#4de1c1",
+  "Gas": "#ffd166",
+  "Parking/Tolls": "#ff6b7d",
+  "Car Maintenance": "#66a7ff",
+  "Public Transit": "#4de1c1",
+  "Rideshare": "#ff4fb8",
 
-  --shadow: 0 18px 60px rgba(0,0,0,0.45);
-  --radius: 18px;
+  "Electricity": "#ffd166",
+  "Water": "#66a7ff",
+  "Gas Utility": "#ff6b7d",
+  "Trash": "#9b8cff",
+  "Phone": "#4de1c1",
+  "Internet": "#ff4fb8",
 
-  /* Neon palette */
-  --hotpink:#ff4fb8;
-  --neonblue:#66a7ff;
-  --neongreen:#4de1c1;
-  --neonyellow:#ffd166;
-  --neonpurple:#9b8cff;
-  --neonred:#ff6b7d;
+  "Groceries": "#4de1c1",
+  "Dining": "#ff4fb8",
+  "Coffee/Snacks": "#ffd166",
+
+  "Subscriptions": "#66a7ff",
+  "Movies/Entertainment": "#ff4fb8",
+  "Shopping": "#9b8cff",
+  "Gym/Fitness": "#4de1c1",
+  "Beauty": "#ffd166",
+  "Hobbies": "#66a7ff",
+
+  "Health Insurance": "#4de1c1",
+  "Medical": "#ff6b7d",
+  "Debt Payments": "#ff6b7d",
+  "Investments": "#66a7ff",
+  "Savings": "#4de1c1",
+
+  "Gifts/Donations": "#ffd166",
+  "Travel": "#9b8cff",
+  "Other": "#66a7ff",
+};
+
+function catColor(cat){
+  return CATEGORY_COLORS[cat] || "#66a7ff";
 }
 
-*{ box-sizing:border-box; }
-html,body{ height:100%; }
+const $ = (id) => document.getElementById(id);
 
-body{
-  margin:0;
-  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Apple Color Emoji","Segoe UI Emoji";
-  color: var(--text);
-  background:
-    radial-gradient(1200px 900px at 15% 0%, rgba(102,167,255,0.18), transparent 60%),
-    radial-gradient(1200px 900px at 90% 10%, rgba(77,225,193,0.10), transparent 55%),
-    linear-gradient(180deg, var(--bg1), var(--bg0));
+function currency(n){
+  const v = Number(n || 0);
+  return v.toLocaleString(undefined, { style:"currency", currency:"USD" });
 }
 
-.bg-glow{
-  position:fixed; inset:-60px;
-  background:
-    radial-gradient(700px 400px at 25% 15%, rgba(14,42,102,0.55), transparent 70%),
-    radial-gradient(600px 420px at 80% 20%, rgba(255,79,184,0.18), transparent 70%),
-    radial-gradient(700px 420px at 60% 85%, rgba(102,167,255,0.12), transparent 70%);
-  filter: blur(18px);
-  pointer-events:none;
-  z-index:-1;
+function pad2(n){ return String(n).padStart(2,"0"); }
+
+function ymd(date){
+  const d = new Date(date);
+  return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
 }
 
-.topbar{
-  position: sticky;
-  top:0;
-  backdrop-filter: blur(14px);
-  background: rgba(5,10,21,0.55);
-  border-bottom: 1px solid var(--stroke);
-  display:flex;
-  justify-content: space-between;
-  align-items:center;
-  padding: 14px 18px;
-  gap: 14px;
+function safeParseJSON(text){
+  try { return JSON.parse(text); } catch { return null; }
 }
 
-.brand{ display:flex; align-items:center; gap:12px; }
-
-.logo{
-  width:42px; height:42px;
-  border-radius: 14px;
-  display:grid; place-items:center;
-  background: linear-gradient(135deg, rgba(255,79,184,0.30), rgba(102,167,255,0.30), rgba(77,225,193,0.18));
-  border:1px solid rgba(255,255,255,0.18);
-  box-shadow: var(--shadow);
-  font-weight:800;
-  letter-spacing:0.5px;
+function loadData(){
+  const raw = localStorage.getItem(STORAGE_KEY);
+  const obj = raw ? safeParseJSON(raw) : null;
+  if (obj && typeof obj === "object") return obj;
+  return { transactions: [] }; // {id, date, category, amount, note}
 }
 
-.title{ font-weight:800; font-size:16px; }
-.subtitle{ color: var(--muted); font-size:12px; margin-top:2px; }
-
-.controls{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:flex-end; }
-
-.pill{
-  display:flex; align-items:center; gap:8px;
-  padding: 8px 10px;
-  border-radius: 999px;
-  background: rgba(255,255,255,0.06);
-  border: 1px solid var(--stroke);
+function saveData(data){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 }
 
-.pill-label{ color: var(--muted); font-size:12px; }
-
-select, input{
-  color: var(--text);
-  background: rgba(255,255,255,0.06);
-  border: 1px solid var(--stroke);
-  border-radius: 12px;
-  padding: 10px 12px;
-  outline: none;
+function uid(){
+  return Math.random().toString(16).slice(2) + Date.now().toString(16);
 }
 
-select:focus, input:focus{
-  border-color: rgba(102,167,255,0.6);
-  box-shadow: 0 0 0 4px rgba(102,167,255,0.12);
+function monthKey(year, monthIndex){
+  return `${year}-${pad2(monthIndex+1)}`; // YYYY-MM
 }
 
-select{ padding: 8px 10px; border-radius: 12px; }
-
-.divider{ width:1px; height:28px; background: var(--stroke); margin:0 4px; }
-
-.btn{
-  border: 1px solid var(--stroke);
-  background: rgba(255,255,255,0.06);
-  color: var(--text);
-  padding: 10px 12px;
-  border-radius: 12px;
-  cursor:pointer;
-  transition: transform .12s ease, background .12s ease, border-color .12s ease;
+function getMonthTx(data, year, monthIndex){
+  const key = monthKey(year, monthIndex);
+  return data.transactions.filter(t => t.date.slice(0,7) === key);
 }
 
-.btn:hover{
-  transform: translateY(-1px);
-  background: rgba(255,255,255,0.09);
-  border-color: rgba(255,255,255,0.18);
+function sumTx(list){
+  return list.reduce((a,t) => a + Number(t.amount || 0), 0);
 }
 
-.btn.small{ padding: 8px 10px; border-radius: 12px; font-size: 13px; }
-
-.btn.primary{
-  background: linear-gradient(135deg, rgba(255,79,184,0.28), rgba(102,167,255,0.28), rgba(77,225,193,0.18));
-  border-color: rgba(255,79,184,0.22);
+function groupByCategory(list){
+  const map = new Map();
+  for (const t of list){
+    const k = t.category || "Other";
+    map.set(k, (map.get(k) || 0) + Number(t.amount || 0));
+  }
+  return [...map.entries()].sort((a,b)=>b[1]-a[1]);
 }
 
-.btn.primary:hover{
-  background: linear-gradient(135deg, rgba(255,79,184,0.38), rgba(102,167,255,0.36), rgba(77,225,193,0.22));
+function daysInMonth(year, monthIndex){
+  return new Date(year, monthIndex+1, 0).getDate();
 }
 
-.btn.danger{
-  background: linear-gradient(135deg, rgba(255,107,125,0.22), rgba(50,10,18,0.65));
-  border-color: rgba(255,107,125,0.30);
+function firstDayDow(year, monthIndex){
+  return new Date(year, monthIndex, 1).getDay(); // 0=Sun
 }
 
-.btn.ghost{ background: rgba(255,255,255,0.05); }
-.filelike{ display:inline-flex; align-items:center; gap:8px; }
-
-.grid{
-  display:grid;
-  grid-template-columns: 1.05fr 1.55fr;
-  gap: 16px;
-  padding: 16px;
-  max-width: 1250px;
-  margin: 0 auto;
+function escapeHtml(s){
+  return String(s)
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#039;");
 }
 
-/* Richer cards */
-.card{
-  border-radius: var(--radius);
-  background: linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.05));
-  border: 1px solid rgba(255,255,255,0.14);
-  box-shadow: var(--shadow);
-  padding: 14px;
+/* State */
+let data = loadData();
+let activeYear = new Date().getFullYear();
+let activeMonth = new Date().getMonth();
+let activeDayFilter = null; // "YYYY-MM-DD" or null
+
+/* Elements */
+const yearSelect = $("yearSelect");
+const monthSelect = $("monthSelect");
+const compareMonthSelect = $("compareMonthSelect");
+const calendarGrid = $("calendarGrid");
+const calendarLabel = $("calendarLabel");
+const activeFilterChip = $("activeFilterChip");
+const clearDayFilterBtn = $("clearDayFilterBtn");
+
+const txForm = $("txForm");
+const txDate = $("txDate");
+const txCategory = $("txCategory");
+const txAmount = $("txAmount");
+const txNote = $("txNote");
+
+const statTotal = $("statTotal");
+const statCount = $("statCount");
+const statAvg = $("statAvg");
+
+const categoryBars = $("categoryBars");
+const monthStatsLabel = $("monthStatsLabel");
+
+const txList = $("txList");
+const txListLabel = $("txListLabel");
+const searchInput = $("searchInput");
+const sortSelect = $("sortSelect");
+
+const todayBtn = $("todayBtn");
+const exportBtn = $("exportBtn");
+const importInput = $("importInput");
+const wipeBtn = $("wipeBtn");
+
+const compareThis = $("compareThis");
+const compareOther = $("compareOther");
+const compareDelta = $("compareDelta");
+
+/* Setup selectors */
+function buildYearOptions(){
+  const nowY = new Date().getFullYear();
+  const years = [];
+  for (let y = nowY - 3; y <= nowY + 1; y++) years.push(y);
+  yearSelect.innerHTML = years.map(y => `<option value="${y}">${y}</option>`).join("");
 }
 
-.card:hover{
-  border-color: rgba(102,167,255,0.22);
-  box-shadow: 0 18px 60px rgba(0,0,0,0.45), 0 0 0 1px rgba(102,167,255,0.08) inset;
+function buildMonthOptions(){
+  monthSelect.innerHTML = monthNames.map((m,i)=>`<option value="${i}">${m}</option>`).join("");
 }
 
-.card-head{
-  display:flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 10px;
-  margin-bottom: 12px;
+function buildCompareOptions(){
+  compareMonthSelect.innerHTML = monthNames
+    .map((m,i)=>`<option value="${i}">${m} ${activeYear}</option>`)
+    .join("");
 }
 
-h2{ margin:0; font-size: 16px; }
-.h3{ margin: 0 0 10px 0; font-size: 13px; color: var(--muted); font-weight: 700; }
-.muted{ color: var(--muted); font-size: 12px; }
-
-.stack{ display:flex; flex-direction:column; gap: 16px; }
-
-.calendar{ display:flex; flex-direction:column; gap: 10px; }
-
-.cal-dow{
-  display:grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 8px;
-  color: var(--muted);
-  font-size: 12px;
-}
-.cal-dow > div{ padding: 0 6px; }
-
-.cal-grid{
-  display:grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 8px;
+function syncSelectors(){
+  yearSelect.value = String(activeYear);
+  monthSelect.value = String(activeMonth);
+  buildCompareOptions();
+  const prev = (activeMonth + 11) % 12;
+  compareMonthSelect.value = String(prev);
 }
 
-.day{
-  border-radius: 14px;
-  border: 1px solid var(--stroke);
-  background: rgba(255,255,255,0.05);
-  padding: 10px 10px 8px;
-  min-height: 72px;
-  cursor:pointer;
-  transition: transform .12s ease, background .12s ease, border-color .12s ease;
-  position:relative;
-  overflow:hidden;
-}
-.day:hover{
-  transform: translateY(-1px);
-  background: rgba(255,255,255,0.08);
-  border-color: rgba(255,255,255,0.18);
-}
-.day.off{ opacity: 0.35; cursor: default; }
-.day.off:hover{ transform:none; background: rgba(255,255,255,0.05); }
-
-.day .num{ font-weight: 800; font-size: 13px; }
-
-.day .sum{
-  margin-top: 8px;
-  font-size: 12px;
-  color: rgba(102,167,255,0.92);
-  font-weight: 700;
+function setDefaultDateInput(){
+  const today = new Date();
+  const isActiveNow = (today.getFullYear() === activeYear && today.getMonth() === activeMonth);
+  const d = isActiveNow ? today : new Date(activeYear, activeMonth, 1);
+  txDate.value = ymd(d);
 }
 
-.day .dot{
-  position:absolute;
-  inset:auto 8px 8px auto;
-  width: 8px; height: 8px;
-  border-radius: 999px;
-  background: rgba(77,225,193,0.95);
-  box-shadow: 0 0 0 6px rgba(77,225,193,0.10);
+/* Calendar rendering */
+function renderCalendar(){
+  const dim = daysInMonth(activeYear, activeMonth);
+  const startDow = firstDayDow(activeYear, activeMonth);
+
+  calendarLabel.textContent = `${monthNames[activeMonth]} ${activeYear}`;
+  calendarGrid.innerHTML = "";
+
+  const monthTx = getMonthTx(data, activeYear, activeMonth);
+  const perDay = new Map();
+  for (const t of monthTx){
+    perDay.set(t.date, (perDay.get(t.date) || 0) + Number(t.amount || 0));
+  }
+
+  for (let i=0; i<startDow; i++){
+    const cell = document.createElement("div");
+    cell.className = "day off";
+    calendarGrid.appendChild(cell);
+  }
+
+  for (let day=1; day<=dim; day++){
+    const dateStr = `${activeYear}-${pad2(activeMonth+1)}-${pad2(day)}`;
+    const sum = perDay.get(dateStr) || 0;
+
+    const cell = document.createElement("div");
+    cell.className = "day";
+    if (activeDayFilter === dateStr) cell.classList.add("active");
+
+    cell.innerHTML = `
+      <div class="num">${day}</div>
+      ${sum > 0 ? `<div class="sum">${currency(sum)}</div><div class="dot"></div>` : `<div class="sum" style="opacity:.45">—</div>`}
+    `;
+
+    cell.addEventListener("click", ()=>{
+      activeDayFilter = (activeDayFilter === dateStr) ? null : dateStr;
+      updateFilterChip();
+      renderAll();
+    });
+
+    calendarGrid.appendChild(cell);
+  }
 }
 
-.day.active{
-  border-color: rgba(102,167,255,0.55);
-  background: rgba(102,167,255,0.10);
+function updateFilterChip(){
+  activeFilterChip.textContent = activeDayFilter ? `Filtered: ${activeDayFilter}` : "All days";
 }
 
-.cal-footer{
-  display:flex; align-items:center; justify-content: space-between;
-  gap: 10px; margin-top: 10px;
+/* Summary + list */
+function getFilteredTx(){
+  const monthTx = getMonthTx(data, activeYear, activeMonth);
+  let list = monthTx;
+
+  if (activeDayFilter){
+    list = list.filter(t => t.date === activeDayFilter);
+  }
+
+  const q = (searchInput.value || "").trim().toLowerCase();
+  if (q){
+    list = list.filter(t =>
+      (t.category || "").toLowerCase().includes(q) ||
+      (t.note || "").toLowerCase().includes(q)
+    );
+  }
+
+  const sort = sortSelect.value;
+  list = [...list];
+  if (sort === "dateDesc") list.sort((a,b)=> b.date.localeCompare(a.date));
+  if (sort === "dateAsc") list.sort((a,b)=> a.date.localeCompare(b.date));
+  if (sort === "amountDesc") list.sort((a,b)=> Number(b.amount)-Number(a.amount));
+  if (sort === "amountAsc") list.sort((a,b)=> Number(a.amount)-Number(b.amount));
+
+  return list;
 }
 
-.chip{
-  padding: 8px 10px;
-  border-radius: 999px;
-  background: rgba(255,255,255,0.06);
-  border: 1px solid var(--stroke);
-  font-size: 12px;
+function renderSummary(){
+  const monthTx = getMonthTx(data, activeYear, activeMonth);
+  const total = sumTx(monthTx);
+  const count = monthTx.length;
+  const dim = daysInMonth(activeYear, activeMonth);
+  const avg = total / dim;
+
+  monthStatsLabel.textContent = `${monthNames[activeMonth]} ${activeYear}`;
+  statTotal.textContent = currency(total);
+  statCount.textContent = String(count);
+  statAvg.textContent = currency(avg);
+
+  const groups = groupByCategory(monthTx);
+  const max = groups.length ? groups[0][1] : 0;
+
+  categoryBars.innerHTML = groups.length ? "" : `<div class="muted">No data yet for this month.</div>`;
+
+  for (const [cat, val] of groups){
+    const pct = max ? (val / max) * 100 : 0;
+    const c = catColor(cat);
+
+    const el = document.createElement("div");
+    el.className = "bar";
+    el.innerHTML = `
+      <div class="bar-top">
+        <div><strong>${cat}</strong></div>
+        <div>${currency(val)}</div>
+      </div>
+      <div class="bar-fill" style="width:${pct.toFixed(1)}%; --c:${c}"></div>
+    `;
+    categoryBars.appendChild(el);
+  }
 }
 
-.form{
-  display:grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
+function renderTransactions(){
+  const list = getFilteredTx();
+
+  const monthTx = getMonthTx(data, activeYear, activeMonth);
+  const monthTotal = sumTx(monthTx);
+
+  txListLabel.textContent = activeDayFilter
+    ? `${list.length} tx • ${activeDayFilter}`
+    : `${monthTx.length} tx • ${currency(monthTotal)}`;
+
+  txList.innerHTML = "";
+  if (!list.length){
+    const empty = document.createElement("div");
+    empty.className = "muted";
+    empty.textContent = "No transactions match your filters.";
+    txList.appendChild(empty);
+    return;
+  }
+
+  for (const t of list){
+    const row = document.createElement("div");
+    row.className = "tx";
+
+    const c = catColor(t.category || "Other");
+    row.innerHTML = `
+      <div class="tx-left">
+        <div class="tx-title">
+          <span class="badge" style="--c:${c}">
+            <span class="badge-dot" style="background:${c}; box-shadow: 0 0 0 6px rgba(255,255,255,0.08), 0 0 18px rgba(0,0,0,0.25)"></span>
+            ${escapeHtml(t.category || "Other")}
+          </span>
+        </div>
+        <div class="tx-sub">${t.date}${t.note ? " • " + escapeHtml(t.note) : ""}</div>
+      </div>
+      <div class="tx-right">
+        <div class="amount">${currency(t.amount)}</div>
+        <button class="del" title="Delete">Delete</button>
+      </div>
+    `;
+
+    row.querySelector(".del").addEventListener("click", ()=>{
+      data.transactions = data.transactions.filter(x => x.id !== t.id);
+      saveData(data);
+      renderAll();
+    });
+
+    txList.appendChild(row);
+  }
 }
 
-.field{ display:flex; flex-direction:column; gap: 6px; }
-.field.wide{ grid-column: 1 / -1; }
+/* Compare months */
+function renderCompare(){
+  const monthTx = getMonthTx(data, activeYear, activeMonth);
+  const totalThis = sumTx(monthTx);
 
-label{ font-size: 12px; color: var(--muted); font-weight: 700; }
+  const otherMonth = Number(compareMonthSelect.value);
+  const otherTx = getMonthTx(data, activeYear, otherMonth);
+  const totalOther = sumTx(otherTx);
 
-.money{
-  display:flex; align-items:center;
-  border: 1px solid var(--stroke);
-  border-radius: 12px;
-  background: rgba(255,255,255,0.06);
-  overflow:hidden;
+  compareThis.textContent = currency(totalThis);
+  compareOther.textContent = currency(totalOther);
+
+  const delta = totalThis - totalOther;
+  compareDelta.classList.remove("pos","neg");
+
+  if (delta === 0){
+    compareDelta.textContent = "Same spending as compared month.";
+  } else if (delta > 0){
+    compareDelta.classList.add("pos");
+    compareDelta.textContent = `${currency(delta)} more than ${monthNames[otherMonth]}`;
+  } else {
+    compareDelta.classList.add("neg");
+    compareDelta.textContent = `${currency(Math.abs(delta))} less than ${monthNames[otherMonth]}`;
+  }
 }
 
-.currency{
-  padding: 0 10px;
-  color: var(--muted);
-  font-weight: 800;
+/* Main render */
+function renderAll(){
+  setDefaultDateInput();
+  updateFilterChip();
+  renderCalendar();
+  renderSummary();
+  renderCompare();
+  renderTransactions();
 }
 
-.money input{
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  width: 100%;
-}
+/* Events */
+yearSelect.addEventListener("change", ()=>{
+  activeYear = Number(yearSelect.value);
+  activeDayFilter = null;
+  buildCompareOptions();
+  renderAll();
+});
 
-.stats{
-  display:grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  margin-bottom: 12px;
-}
+monthSelect.addEventListener("change", ()=>{
+  activeMonth = Number(monthSelect.value);
+  activeDayFilter = null;
+  buildCompareOptions();
+  renderAll();
+});
 
-.stat{
-  padding: 12px;
-  border-radius: 16px;
-  background: rgba(255,255,255,0.06);
-  border: 1px solid var(--stroke);
-}
+compareMonthSelect.addEventListener("change", renderCompare);
 
-.stat-label{ color: var(--muted); font-size: 12px; font-weight: 700; }
-.stat-value{ font-size: 18px; font-weight: 900; margin-top: 6px; }
+clearDayFilterBtn.addEventListener("click", ()=>{
+  activeDayFilter = null;
+  renderAll();
+});
 
-.split{
-  display:grid;
-  grid-template-columns: 1.2fr 1fr;
-  gap: 14px;
-  align-items:start;
-}
+searchInput.addEventListener("input", renderTransactions);
+sortSelect.addEventListener("change", renderTransactions);
 
-.bars{ display:flex; flex-direction:column; gap: 10px; }
+todayBtn.addEventListener("click", ()=>{
+  const d = new Date();
+  activeYear = d.getFullYear();
+  activeMonth = d.getMonth();
+  activeDayFilter = null;
+  syncSelectors();
+  renderAll();
+});
 
-.bar{
-  border-radius: 16px;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid var(--stroke);
-  padding: 10px;
-}
+txForm.addEventListener("submit", (e)=>{
+  e.preventDefault();
 
-.bar-top{
-  display:flex; justify-content:space-between; gap:10px;
-  font-size: 12px; color: var(--muted);
-}
+  const date = txDate.value;
+  const category = txCategory.value;
+  const amount = Number(txAmount.value);
+  const note = (txNote.value || "").trim();
 
-.bar-fill{
-  height: 10px;
-  margin-top: 8px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, var(--c, rgba(102,167,255,0.75)), rgba(255,255,255,0.12));
-  width: 0%;
-  transition: width .25s ease;
-}
+  if (!date || !category || !Number.isFinite(amount) || amount <= 0){
+    alert("Please enter a valid date, category, and amount.");
+    return;
+  }
 
-.bar strong{ color: var(--text); font-weight: 900; }
+  data.transactions.push({
+    id: uid(),
+    date,
+    category,
+    amount: Math.round(amount * 100) / 100,
+    note
+  });
 
-.compare{ display:flex; flex-direction:column; gap: 10px; }
+  saveData(data);
 
-.compareBox{
-  padding: 10px;
-  border-radius: 16px;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid var(--stroke);
-}
+  const [y,m] = date.split("-").map(Number);
+  if (y !== activeYear || (m-1) !== activeMonth){
+    activeYear = y;
+    activeMonth = m-1;
+    activeDayFilter = null;
+    syncSelectors();
+  }
 
-.compareVal{ font-size: 16px; font-weight: 900; margin-top: 6px; }
+  txAmount.value = "";
+  txNote.value = "";
+  renderAll();
+});
 
-.delta{
-  padding: 10px;
-  border-radius: 16px;
-  border: 1px solid var(--stroke);
-  background: rgba(255,255,255,0.05);
-  font-weight: 900;
-}
+exportBtn.addEventListener("click", ()=>{
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type:"application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `budget-planner-backup-${new Date().toISOString().slice(0,10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+});
 
-.delta.pos{ color: var(--bad); border-color: rgba(255,107,125,0.35); background: rgba(255,107,125,0.08); }
-.delta.neg{ color: var(--good); border-color: rgba(77,225,193,0.35); background: rgba(77,225,193,0.08); }
+importInput.addEventListener("change", async ()=>{
+  const file = importInput.files?.[0];
+  if (!file) return;
 
-.tx-tools{
-  display:flex; gap: 10px; align-items:center;
-  margin-bottom: 12px;
-}
+  const text = await file.text();
+  const obj = safeParseJSON(text);
+  if (!obj || !obj.transactions || !Array.isArray(obj.transactions)){
+    alert("That file doesn't look like a valid backup.");
+    importInput.value = "";
+    return;
+  }
 
-.search{ flex: 1; }
-.sort{ width: 160px; }
+  obj.transactions = obj.transactions
+    .filter(t => t && typeof t === "object")
+    .map(t => ({
+      id: t.id || uid(),
+      date: String(t.date || "").slice(0,10),
+      category: String(t.category || "Other"),
+      amount: Number(t.amount || 0),
+      note: String(t.note || "")
+    }))
+    .filter(t => /^\d{4}-\d{2}-\d{2}$/.test(t.date) && Number.isFinite(t.amount) && t.amount >= 0);
 
-.tx-list{ display:flex; flex-direction:column; gap: 10px; }
+  data = obj;
+  saveData(data);
+  renderAll();
+  importInput.value = "";
+});
 
-.tx{
-  display:flex; justify-content: space-between; align-items:center;
-  gap: 12px;
-  padding: 12px;
-  border-radius: 16px;
-  border: 1px solid var(--stroke);
-  background: rgba(255,255,255,0.05);
-}
+wipeBtn.addEventListener("click", ()=>{
+  const ok = confirm("Reset will delete all saved data from this browser. Continue?");
+  if (!ok) return;
+  data = { transactions: [] };
+  saveData(data);
+  activeDayFilter = null;
+  renderAll();
+});
 
-.tx-left{ display:flex; flex-direction:column; gap: 6px; }
+/* Init */
+(function init(){
+  buildYearOptions();
+  buildMonthOptions();
 
-.tx-title{ font-weight: 900; }
+  const now = new Date();
+  activeYear = now.getFullYear();
+  activeMonth = now.getMonth();
 
-.tx-sub{ color: var(--muted); font-size: 12px; }
-
-.tx-right{ display:flex; align-items:center; gap: 10px; }
-
-.amount{ font-weight: 900; }
-
-.del{
-  border: 1px solid rgba(255,107,125,0.30);
-  background: rgba(255,107,125,0.10);
-  color: var(--text);
-  border-radius: 12px;
-  padding: 8px 10px;
-  cursor:pointer;
-}
-
-.del:hover{ background: rgba(255,107,125,0.16); }
-
-.footer{
-  max-width: 1250px;
-  margin: 0 auto;
-  padding: 10px 16px 18px;
-}
-
-/* Category badge */
-.badge{
-  display:inline-flex;
-  align-items:center;
-  gap:8px;
-  padding: 6px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 900;
-  border: 1px solid rgba(255,255,255,0.14);
-  background: rgba(255,255,255,0.06);
-}
-
-.badge-dot{
-  width:10px;height:10px;border-radius:999px;
-  background: var(--c, var(--neonblue));
-  box-shadow: 0 0 0 6px rgba(102,167,255,0.14);
-}
-
-/* Better mobile */
-@media (max-width: 980px){
-  .grid{ grid-template-columns: 1fr; }
-  .split{ grid-template-columns: 1fr; }
-}
+  syncSelectors();
+  setDefaultDateInput();
+  updateFilterChip();
+  renderAll();
+})();
