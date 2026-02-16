@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Budget Planner</title>
+    <link rel="stylesheet" href="styles.css" />
+    <meta name="theme-color" content="#0b1b3a" />
+  </head>
+  <body>
+    <div class="bg-glow"></div>
+
+    <header class="topbar">
+      <div class="brand">
+        <div class="logo">BP</div>
+        <div>
+          <div class="title">Budget Planner</div>
+          <div class="subtitle">Midnight Blue • Monthly Tracking</div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <div class="pill">
+          <span class="pill-label">Year</span>
+          <select id="yearSelect" aria-label="Year"></select>
+        </div>
+
+        <div class="pill">
+          <span class="pill-label">Month</span>
+          <select id="monthSelect" aria-label="Month"></select>
+        </div>
+
+        <button class="btn ghost" id="todayBtn" title="Jump to current month">
+          Today
+        </button>
+
+        <div class="divider"></div>
+
+        <button class="btn ghost" id="exportBtn" title="Export all data to JSON">
+          Export
+        </button>
+        <label class="btn ghost filelike" title="Import JSON backup">
+          Import
+          <input id="importInput" type="file" accept="application/json" hidden />
+        </label>
+
+        <button class="btn danger" id="wipeBtn" title="Wipe all local data">
+          Reset
+        </button>
+      </div>
+    </header>
+
+    <main class="grid">
+      <!-- LEFT -->
+      <section class="card">
+        <div class="card-head">
+          <h2>Calendar</h2>
+          <div class="muted" id="calendarLabel">—</div>
+        </div>
+
+        <div class="calendar">
+          <div class="cal-dow">
+            <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+          </div>
+          <div class="cal-grid" id="calendarGrid" aria-label="Calendar grid"></div>
+        </div>
+
+        <div class="cal-footer">
+          <div class="chip" id="activeFilterChip">All days</div>
+          <button class="btn ghost small" id="clearDayFilterBtn">Clear day filter</button>
+        </div>
+      </section>
+
+      <!-- RIGHT -->
+      <section class="stack">
+        <section class="card">
+          <div class="card-head">
+            <h2>Add Spending</h2>
+            <div class="muted">Saves automatically</div>
+          </div>
+
+          <form id="txForm" class="form">
+            <div class="field">
+              <label for="txDate">Date</label>
+              <input id="txDate" type="date" required />
+            </div>
+
+            <div class="field">
+              <label for="txCategory">Category</label>
+              <select id="txCategory" required>
+                <option value="Rent">Rent</option>
+                <option value="Car Payment">Car Payment</option>
+                <option value="Insurance">Insurance</option>
+                <option value="Gas">Gas</option>
+                <option value="Groceries">Groceries</option>
+                <option value="Utilities">Utilities</option>
+                <option value="Phone/Internet">Phone/Internet</option>
+                <option value="Subscriptions">Subscriptions</option>
+                <option value="Dining">Dining</option>
+                <option value="Shopping">Shopping</option>
+                <option value="Health">Health</option>
+                <option value="Other" selected>Other</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="txAmount">Amount</label>
+              <div class="money">
+                <span class="currency">$</span>
+                <input id="txAmount" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0.00" required />
+              </div>
+            </div>
+
+            <div class="field wide">
+              <label for="txNote">Note (optional)</label>
+              <input id="txNote" type="text" maxlength="80" placeholder="e.g., Shell station, policy renewal…" />
+            </div>
+
+            <button class="btn primary wide" type="submit">Add</button>
+          </form>
+        </section>
+
+        <section class="card">
+          <div class="card-head">
+            <h2>Monthly Summary</h2>
+            <div class="muted" id="monthStatsLabel">—</div>
+          </div>
+
+          <div class="stats">
+            <div class="stat">
+              <div class="stat-label">Total</div>
+              <div class="stat-value" id="statTotal">$0.00</div>
+            </div>
+            <div class="stat">
+              <div class="stat-label">Transactions</div>
+              <div class="stat-value" id="statCount">0</div>
+            </div>
+            <div class="stat">
+              <div class="stat-label">Daily Avg</div>
+              <div class="stat-value" id="statAvg">$0.00</div>
+            </div>
+          </div>
+
+          <div class="split">
+            <div>
+              <h3 class="h3">By category</h3>
+              <div class="bars" id="categoryBars"></div>
+            </div>
+
+            <div>
+              <h3 class="h3">Compare months</h3>
+              <div class="compare">
+                <select id="compareMonthSelect" aria-label="Compare month"></select>
+                <div class="compareBox">
+                  <div class="muted">This month</div>
+                  <div class="compareVal" id="compareThis">$0.00</div>
+                </div>
+                <div class="compareBox">
+                  <div class="muted">Compared month</div>
+                  <div class="compareVal" id="compareOther">$0.00</div>
+                </div>
+                <div class="delta" id="compareDelta">—</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card-head">
+            <h2>Transactions</h2>
+            <div class="muted" id="txListLabel">—</div>
+          </div>
+
+          <div class="tx-tools">
+            <input id="searchInput" class="search" type="search" placeholder="Search category or note…" />
+            <select id="sortSelect" class="sort" aria-label="Sort">
+              <option value="dateDesc" selected>Newest</option>
+              <option value="dateAsc">Oldest</option>
+              <option value="amountDesc">Highest</option>
+              <option value="amountAsc">Lowest</option>
+            </select>
+          </div>
+
+          <div class="tx-list" id="txList"></div>
+        </section>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <span class="muted">Data is stored locally in your browser (LocalStorage). Use Export for backups.</span>
+    </footer>
+
+    <script src="app.js"></script>
+  </body>
+</html>
