@@ -150,8 +150,24 @@ const clearDayFilterBtn = $("clearDayFilterBtn");
 const txForm = $("txForm");
 const txDate = $("txDate");
 const txBucket = $("txBucket");
+// Bucket button selector (replaces dropdown)
+const bucketGrid = $("bucketGrid");
+if (bucketGrid) {
+  bucketGrid.addEventListener("click", (e) => {
+    const btn = e.target.closest(".bucket-btn");
+    if (!btn) return;
+
+    // set hidden input value
+    txBucket.value = btn.dataset.bucket;
+
+    // update active styling
+    bucketGrid.querySelectorAll(".bucket-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+  });
+}
 const txAmount = $("txAmount");
 const txNote = $("txNote");
+
 
 const statTotal = $("statTotal");
 const statCount = $("statCount");
