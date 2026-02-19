@@ -418,3 +418,36 @@ label{ font-size: 12px; color: var(--muted); font-weight: 700; }
   .grid{ grid-template-columns: 1fr; }
   .split{ grid-template-columns: 1fr; }
 }
+/* Bucket buttons */
+.bucket-grid{
+  display:grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.bucket-btn{
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.06);
+  color: var(--text);
+  font-weight: 900;
+  cursor:pointer;
+  transition: transform .12s ease, background .12s ease, border-color .12s ease;
+}
+
+.bucket-btn:hover{
+  transform: translateY(-1px);
+  background: rgba(255,255,255,0.10);
+  border-color: rgba(255,255,255,0.18);
+}
+
+.bucket-btn.active{
+  border-color: rgba(102,167,255,0.45);
+  background: rgba(102,167,255,0.14);
+  box-shadow: 0 0 0 4px rgba(102,167,255,0.10);
+}
+
+@media (max-width: 520px){
+  .bucket-grid{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
