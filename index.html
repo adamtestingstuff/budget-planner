@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Budget Planner</title>
     <link rel="stylesheet" href="styles.css" />
-    <meta name="theme-color" content="#0b1b3a" />
+    <meta name="theme-color" content="#070f22" />
   </head>
   <body>
     <div class="bg-glow"></div>
@@ -15,7 +15,7 @@
         <div class="logo">BP</div>
         <div>
           <div class="title">Budget Planner</div>
-          <div class="subtitle">Midnight Blue • Monthly Tracking</div>
+          <div class="subtitle">Monthly tracker • Midnight Blue</div>
         </div>
       </div>
 
@@ -30,163 +30,149 @@
           <select id="monthSelect" aria-label="Month"></select>
         </div>
 
-        <button class="btn ghost" id="todayBtn" title="Jump to current month">
-          Today
-        </button>
+        <button class="btn ghost" id="todayBtn" title="Jump to current month">Today</button>
 
         <div class="divider"></div>
 
-        <button class="btn ghost" id="exportBtn" title="Export all data to JSON">
-          Export
-        </button>
+        <button class="btn ghost" id="exportBtn" title="Export all data to JSON">Export</button>
         <label class="btn ghost filelike" title="Import JSON backup">
           Import
           <input id="importInput" type="file" accept="application/json" hidden />
         </label>
 
-        <button class="btn danger" id="wipeBtn" title="Wipe all local data">
-          Reset
-        </button>
+        <button class="btn danger" id="wipeBtn" title="Wipe all local data">Reset</button>
       </div>
     </header>
 
-    <main class="grid">
-      <!-- LEFT -->
+    <main class="page">
+      <!-- INCOME -->
       <section class="card">
         <div class="card-head">
-          <h2>Calendar</h2>
-          <div class="muted" id="calendarLabel">—</div>
+          <h2>Income</h2>
+          <div class="muted" id="activeMonthLabel">—</div>
         </div>
 
-        <div class="calendar">
-          <div class="cal-dow">
-            <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+        <div class="income-grid">
+          <div class="field">
+            <label for="salaryInput">Your monthly salary</label>
+            <div class="money">
+              <span class="currency">$</span>
+              <input id="salaryInput" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0.00" />
+            </div>
           </div>
-          <div class="cal-grid" id="calendarGrid" aria-label="Calendar grid"></div>
-        </div>
 
-        <div class="cal-footer">
-          <div class="chip" id="activeFilterChip">All days</div>
-          <button class="btn ghost small" id="clearDayFilterBtn">Clear day filter</button>
+          <div class="field">
+            <label for="otherIncomeInput">Your other earnings</label>
+            <div class="money">
+              <span class="currency">$</span>
+              <input id="otherIncomeInput" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0.00" />
+            </div>
+          </div>
+
+          <div class="income-total">
+            <div class="muted">Total income</div>
+            <div class="big" id="incomeTotal">$0.00</div>
+          </div>
         </div>
       </section>
 
-      <!-- RIGHT -->
-      <section class="stack">
-        <section class="card">
-          <div class="card-head">
-            <h2>Add Monthly Spending</h2>
-            <div class="muted">Pick a bucket (Housing, Bills...) then add amount</div>
+      <!-- ADD EXPENSE -->
+      <section class="card">
+        <div class="card-head">
+          <h2>Add Monthly Expense</h2>
+          <div class="muted">Pick a bucket then add amount</div>
+        </div>
+
+        <form id="expenseForm" class="form">
+          <div class="field wide">
+            <label>Bucket</label>
+
+            <input id="bucketInput" type="hidden" value="Housing" />
+
+            <div class="bucket-grid" id="bucketGrid" role="group" aria-label="Choose a bucket">
+              <button type="button" class="bucket-btn active" data-bucket="Housing">Housing</button>
+              <button type="button" class="bucket-btn" data-bucket="Transport">Transport</button>
+              <button type="button" class="bucket-btn" data-bucket="Insurance">Insurance</button>
+              <button type="button" class="bucket-btn" data-bucket="Groceries">Groceries</button>
+              <button type="button" class="bucket-btn" data-bucket="Lifestyle">Lifestyle</button>
+              <button type="button" class="bucket-btn" data-bucket="Memberships">Memberships</button>
+              <button type="button" class="bucket-btn" data-bucket="Other">Other</button>
+            </div>
           </div>
 
-          <form id="txForm" class="form">
-            <div class="field">
-              <label for="txDate">Date</label>
-              <input id="txDate" type="date" required />
+          <div class="field">
+            <label for="amountInput">Amount</label>
+            <div class="money">
+              <span class="currency">$</span>
+              <input id="amountInput" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0.00" required />
             </div>
+          </div>
 
-<div class="field wide">
-  <label>Bucket</label>
-
-  <!-- hidden input holds the chosen bucket for JS -->
-  <input id="txBucket" type="hidden" value="Housing" />
-
-  <div class="bucket-grid" id="bucketGrid" role="group" aria-label="Choose a bucket">
-    <button type="button" class="bucket-btn active" data-bucket="Housing">Housing</button>
-    <button type="button" class="bucket-btn" data-bucket="Transportation">Transportation</button>
-    <button type="button" class="bucket-btn" data-bucket="Bills">Bills</button>
-    <button type="button" class="bucket-btn" data-bucket="Food">Food</button>
-    <button type="button" class="bucket-btn" data-bucket="Lifestyle">Lifestyle</button>
-    <button type="button" class="bucket-btn" data-bucket="Health & Finance">Health & Finance</button>
-    <button type="button" class="bucket-btn" data-bucket="Other">Other</button>
-  </div>
-</div>
-
-            <div class="field">
-              <label for="txAmount">Amount</label>
-              <div class="money">
-                <span class="currency">$</span>
-                <input id="txAmount" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0.00" required />
-              </div>
-            </div>
-
-            <div class="field wide">
-              <label for="txNote">Note (optional)</label>
-              <input id="txNote" type="text" maxlength="80" placeholder="e.g., Mortgage, Verizon, groceries, etc…" />
-            </div>
-
+          <div class="field">
+            <label>&nbsp;</label>
             <button class="btn primary wide" type="submit">Add</button>
-          </form>
-        </section>
-
-        <section class="card">
-          <div class="card-head">
-            <h2>Monthly Summary</h2>
-            <div class="muted" id="monthStatsLabel">—</div>
           </div>
 
-          <div class="stats">
-            <div class="stat">
-              <div class="stat-label">Total</div>
-              <div class="stat-value" id="statTotal">$0.00</div>
-            </div>
-            <div class="stat">
-              <div class="stat-label">Entries</div>
-              <div class="stat-value" id="statCount">0</div>
-            </div>
-            <div class="stat">
-              <div class="stat-label">Daily Avg</div>
-              <div class="stat-value" id="statAvg">$0.00</div>
-            </div>
+          <div class="field wide row-actions">
+            <button class="btn ghost" id="clearMonthBtn" type="button" title="Reset expenses + income for this month">
+              Clear this month
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <!-- SUMMARY -->
+      <section class="card">
+        <div class="card-head">
+          <h2>Monthly Summary</h2>
+          <div class="muted" id="monthStatsLabel">—</div>
+        </div>
+
+        <div class="stats">
+          <div class="stat">
+            <div class="stat-label">Income</div>
+            <div class="stat-value" id="statIncome">$0.00</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Expenses</div>
+            <div class="stat-value" id="statExpenses">$0.00</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Net</div>
+            <div class="stat-value" id="statNet">$0.00</div>
+          </div>
+        </div>
+
+        <div class="split">
+          <div>
+            <h3 class="h3">By bucket</h3>
+            <div class="bars" id="bucketBars"></div>
           </div>
 
-          <div class="split">
-            <div>
-              <h3 class="h3">By bucket</h3>
-              <div class="bars" id="bucketBars"></div>
-            </div>
+          <div>
+            <h3 class="h3">Compare months</h3>
+            <div class="compare">
+              <select id="compareMonthSelect" aria-label="Compare month"></select>
 
-            <div>
-              <h3 class="h3">Compare months</h3>
-              <div class="compare">
-                <select id="compareMonthSelect" aria-label="Compare month"></select>
-                <div class="compareBox">
-                  <div class="muted">This month</div>
-                  <div class="compareVal" id="compareThis">$0.00</div>
-                </div>
-                <div class="compareBox">
-                  <div class="muted">Compared month</div>
-                  <div class="compareVal" id="compareOther">$0.00</div>
-                </div>
-                <div class="delta" id="compareDelta">—</div>
+              <div class="compareBox">
+                <div class="muted">This month net</div>
+                <div class="compareVal" id="compareThis">$0.00</div>
               </div>
+
+              <div class="compareBox">
+                <div class="muted">Compared month net</div>
+                <div class="compareVal" id="compareOther">$0.00</div>
+              </div>
+
+              <div class="delta" id="compareDelta">—</div>
             </div>
           </div>
-        </section>
-
-        <section class="card">
-          <div class="card-head">
-            <h2>Entries</h2>
-            <div class="muted" id="txListLabel">—</div>
-          </div>
-
-          <div class="tx-tools">
-            <input id="searchInput" class="search" type="search" placeholder="Search bucket or note…" />
-            <select id="sortSelect" class="sort" aria-label="Sort">
-              <option value="dateDesc" selected>Newest</option>
-              <option value="dateAsc">Oldest</option>
-              <option value="amountDesc">Highest</option>
-              <option value="amountAsc">Lowest</option>
-            </select>
-          </div>
-
-          <div class="tx-list" id="txList"></div>
-        </section>
+        </div>
       </section>
     </main>
 
     <footer class="footer">
-      <span class="muted">Data is stored locally in your browser (LocalStorage). Use Export for backups.</span>
+      <span class="muted">Saved locally in your browser (LocalStorage). Use Export for backups.</span>
     </footer>
 
     <script src="app.js"></script>
