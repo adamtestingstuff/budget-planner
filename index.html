@@ -85,18 +85,22 @@
               <input id="txDate" type="date" required />
             </div>
 
-            <div class="field">
-              <label for="txBucket">Bucket</label>
-              <select id="txBucket" required>
-                <option value="Housing" selected>Housing</option>
-                <option value="Transportation">Transportation</option>
-                <option value="Bills">Bills</option>
-                <option value="Food">Food</option>
-                <option value="Lifestyle">Lifestyle</option>
-                <option value="Health & Finance">Health & Finance</option>
-                <option value="Other">Other</option>
-              </select>
-            </div>
+<div class="field wide">
+  <label>Bucket</label>
+
+  <!-- hidden input holds the chosen bucket for JS -->
+  <input id="txBucket" type="hidden" value="Housing" />
+
+  <div class="bucket-grid" id="bucketGrid" role="group" aria-label="Choose a bucket">
+    <button type="button" class="bucket-btn active" data-bucket="Housing">Housing</button>
+    <button type="button" class="bucket-btn" data-bucket="Transportation">Transportation</button>
+    <button type="button" class="bucket-btn" data-bucket="Bills">Bills</button>
+    <button type="button" class="bucket-btn" data-bucket="Food">Food</button>
+    <button type="button" class="bucket-btn" data-bucket="Lifestyle">Lifestyle</button>
+    <button type="button" class="bucket-btn" data-bucket="Health & Finance">Health & Finance</button>
+    <button type="button" class="bucket-btn" data-bucket="Other">Other</button>
+  </div>
+</div>
 
             <div class="field">
               <label for="txAmount">Amount</label>
