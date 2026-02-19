@@ -1,59 +1,24 @@
-/* Budget Planner — LocalStorage month/year buckets + calendar + compare */
+/* Budget Planner — LocalStorage + month/year + buckets */
 
-const STORAGE_KEY = "bp_v1_data";
+const STORAGE_KEY = "bp_v2_data_buckets";
 
 const monthNames = [
   "January","February","March","April","May","June",
   "July","August","September","October","November","December"
 ];
 
-const CATEGORY_COLORS = {
-  "Rent": "#66a7ff",
-  "Mortgage": "#ff4fb8",
-  "HOA": "#9b8cff",
-  "Home Insurance": "#4de1c1",
-  "Property Tax": "#ffd166",
-  "Maintenance/Repairs": "#ff6b7d",
-
-  "Car Payment": "#9b8cff",
-  "Auto Insurance": "#4de1c1",
-  "Gas": "#ffd166",
-  "Parking/Tolls": "#ff6b7d",
-  "Car Maintenance": "#66a7ff",
-  "Public Transit": "#4de1c1",
-  "Rideshare": "#ff4fb8",
-
-  "Electricity": "#ffd166",
-  "Water": "#66a7ff",
-  "Gas Utility": "#ff6b7d",
-  "Trash": "#9b8cff",
-  "Phone": "#4de1c1",
-  "Internet": "#ff4fb8",
-
-  "Groceries": "#4de1c1",
-  "Dining": "#ff4fb8",
-  "Coffee/Snacks": "#ffd166",
-
-  "Subscriptions": "#66a7ff",
-  "Movies/Entertainment": "#ff4fb8",
-  "Shopping": "#9b8cff",
-  "Gym/Fitness": "#4de1c1",
-  "Beauty": "#ffd166",
-  "Hobbies": "#66a7ff",
-
-  "Health Insurance": "#4de1c1",
-  "Medical": "#ff6b7d",
-  "Debt Payments": "#ff6b7d",
-  "Investments": "#66a7ff",
-  "Savings": "#4de1c1",
-
-  "Gifts/Donations": "#ffd166",
-  "Travel": "#9b8cff",
+const BUCKET_COLORS = {
+  "Housing": "#ff4fb8",
+  "Transportation": "#ffd166",
+  "Bills": "#66a7ff",
+  "Food": "#4de1c1",
+  "Lifestyle": "#9b8cff",
+  "Health & Finance": "#ff6b7d",
   "Other": "#66a7ff",
 };
 
-function catColor(cat){
-  return CATEGORY_COLORS[cat] || "#66a7ff";
+function bucketColor(b){
+  return BUCKET_COLORS[b] || "#66a7ff";
 }
 
 const $ = (id) => document.getElementById(id);
@@ -74,49 +39,8 @@ function safeParseJSON(text){
   try { return JSON.parse(text); } catch { return null; }
 }
 
-function loadData(){
-  const raw = localStorage.getItem(STORAGE_KEY);
-  const obj = raw ? safeParseJSON(raw) : null;
-  if (obj && typeof obj === "object") return obj;
-  return { transactions: [] }; // {id, date, category, amount, note}
-}
-
-function saveData(data){
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-}
-
 function uid(){
   return Math.random().toString(16).slice(2) + Date.now().toString(16);
-}
-
-function monthKey(year, monthIndex){
-  return `${year}-${pad2(monthIndex+1)}`; // YYYY-MM
-}
-
-function getMonthTx(data, year, monthIndex){
-  const key = monthKey(year, monthIndex);
-  return data.transactions.filter(t => t.date.slice(0,7) === key);
-}
-
-function sumTx(list){
-  return list.reduce((a,t) => a + Number(t.amount || 0), 0);
-}
-
-function groupByCategory(list){
-  const map = new Map();
-  for (const t of list){
-    const k = t.category || "Other";
-    map.set(k, (map.get(k) || 0) + Number(t.amount || 0));
-  }
-  return [...map.entries()].sort((a,b)=>b[1]-a[1]);
-}
-
-function daysInMonth(year, monthIndex){
-  return new Date(year, monthIndex+1, 0).getDate();
-}
-
-function firstDayDow(year, monthIndex){
-  return new Date(year, monthIndex, 1).getDay(); // 0=Sun
 }
 
 function escapeHtml(s){
@@ -128,13 +52,93 @@ function escapeHtml(s){
     .replaceAll("'","&#039;");
 }
 
-/* State */
+/* ---- Data ----
+We store entries as:
+{ id, date: "YYYY-MM-DD", bucket: "Housing", amount: number, note: string }
+*/
+function loadData(){
+  const raw = localStorage.getItem(STORAGE_KEY);
+  const obj = raw ? safeParseJSON(raw) : null;
+  if (obj && typeof obj === "object" && Array.isArray(obj.entries)) return obj;
+
+  // Migration: if user previously used bp_v1_data, convert best-effort
+  const oldRaw = localStorage.getItem("bp_v1_data");
+  const oldObj = oldRaw ? safeParseJSON(oldRaw) : null;
+
+  if (oldObj && Array.isArray(oldObj.transactions)){
+    const migrated = {
+      entries: oldObj.transactions
+        .filter(t => t && typeof t === "object")
+        .map(t => ({
+          id: t.id || uid(),
+          date: String(t.date || "").slice(0,10),
+          bucket: guessBucketFromOldCategory(String(t.category || "Other")),
+          amount: Number(t.amount || 0),
+          note: String(t.note || t.category || "")
+        }))
+        .filter(e => /^\d{4}-\d{2}-\d{2}$/.test(e.date) && Number.isFinite(e.amount) && e.amount >= 0)
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
+    return migrated;
+  }
+
+  return { entries: [] };
+}
+
+function saveData(data){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+function guessBucketFromOldCategory(cat){
+  const c = (cat || "").toLowerCase();
+
+  if (["rent","mortgage","hoa","home insurance","property tax","maintenance/repairs"].some(x => c.includes(x))) return "Housing";
+  if (["car","auto insurance","gas","parking","toll","transit","rideshare"].some(x => c.includes(x))) return "Transportation";
+  if (["electric","water","utility","trash","phone","internet"].some(x => c.includes(x))) return "Bills";
+  if (["grocery","dining","coffee","snack","food"].some(x => c.includes(x))) return "Food";
+  if (["subscription","movie","entertainment","shopping","gym","beauty","hobbies"].some(x => c.includes(x))) return "Lifestyle";
+  if (["health","medical","debt","investment","savings","insurance"].some(x => c.includes(x))) return "Health & Finance";
+
+  return "Other";
+}
+
+function monthKey(year, monthIndex){
+  return `${year}-${pad2(monthIndex+1)}`; // YYYY-MM
+}
+
+function getMonthEntries(data, year, monthIndex){
+  const key = monthKey(year, monthIndex);
+  return data.entries.filter(e => e.date.slice(0,7) === key);
+}
+
+function sumList(list){
+  return list.reduce((a,x) => a + Number(x.amount || 0), 0);
+}
+
+function groupByBucket(list){
+  const map = new Map();
+  for (const e of list){
+    const k = e.bucket || "Other";
+    map.set(k, (map.get(k) || 0) + Number(e.amount || 0));
+  }
+  return [...map.entries()].sort((a,b)=>b[1]-a[1]);
+}
+
+function daysInMonth(year, monthIndex){
+  return new Date(year, monthIndex+1, 0).getDate();
+}
+
+function firstDayDow(year, monthIndex){
+  return new Date(year, monthIndex, 1).getDay();
+}
+
+/* ---- State ---- */
 let data = loadData();
 let activeYear = new Date().getFullYear();
 let activeMonth = new Date().getMonth();
-let activeDayFilter = null; // "YYYY-MM-DD" or null
+let activeDayFilter = null;
 
-/* Elements */
+/* ---- Elements ---- */
 const yearSelect = $("yearSelect");
 const monthSelect = $("monthSelect");
 const compareMonthSelect = $("compareMonthSelect");
@@ -145,7 +149,7 @@ const clearDayFilterBtn = $("clearDayFilterBtn");
 
 const txForm = $("txForm");
 const txDate = $("txDate");
-const txCategory = $("txCategory");
+const txBucket = $("txBucket");
 const txAmount = $("txAmount");
 const txNote = $("txNote");
 
@@ -153,7 +157,7 @@ const statTotal = $("statTotal");
 const statCount = $("statCount");
 const statAvg = $("statAvg");
 
-const categoryBars = $("categoryBars");
+const bucketBars = $("bucketBars");
 const monthStatsLabel = $("monthStatsLabel");
 
 const txList = $("txList");
@@ -170,7 +174,7 @@ const compareThis = $("compareThis");
 const compareOther = $("compareOther");
 const compareDelta = $("compareDelta");
 
-/* Setup selectors */
+/* ---- Selects ---- */
 function buildYearOptions(){
   const nowY = new Date().getFullYear();
   const years = [];
@@ -203,7 +207,7 @@ function setDefaultDateInput(){
   txDate.value = ymd(d);
 }
 
-/* Calendar rendering */
+/* ---- Calendar ---- */
 function renderCalendar(){
   const dim = daysInMonth(activeYear, activeMonth);
   const startDow = firstDayDow(activeYear, activeMonth);
@@ -211,10 +215,10 @@ function renderCalendar(){
   calendarLabel.textContent = `${monthNames[activeMonth]} ${activeYear}`;
   calendarGrid.innerHTML = "";
 
-  const monthTx = getMonthTx(data, activeYear, activeMonth);
+  const monthEntries = getMonthEntries(data, activeYear, activeMonth);
   const perDay = new Map();
-  for (const t of monthTx){
-    perDay.set(t.date, (perDay.get(t.date) || 0) + Number(t.amount || 0));
+  for (const e of monthEntries){
+    perDay.set(e.date, (perDay.get(e.date) || 0) + Number(e.amount || 0));
   }
 
   for (let i=0; i<startDow; i++){
@@ -250,20 +254,20 @@ function updateFilterChip(){
   activeFilterChip.textContent = activeDayFilter ? `Filtered: ${activeDayFilter}` : "All days";
 }
 
-/* Summary + list */
-function getFilteredTx(){
-  const monthTx = getMonthTx(data, activeYear, activeMonth);
-  let list = monthTx;
+/* ---- Filters ---- */
+function getFilteredEntries(){
+  const monthEntries = getMonthEntries(data, activeYear, activeMonth);
+  let list = monthEntries;
 
   if (activeDayFilter){
-    list = list.filter(t => t.date === activeDayFilter);
+    list = list.filter(e => e.date === activeDayFilter);
   }
 
   const q = (searchInput.value || "").trim().toLowerCase();
   if (q){
-    list = list.filter(t =>
-      (t.category || "").toLowerCase().includes(q) ||
-      (t.note || "").toLowerCase().includes(q)
+    list = list.filter(e =>
+      (e.bucket || "").toLowerCase().includes(q) ||
+      (e.note || "").toLowerCase().includes(q)
     );
   }
 
@@ -277,10 +281,11 @@ function getFilteredTx(){
   return list;
 }
 
+/* ---- Summary ---- */
 function renderSummary(){
-  const monthTx = getMonthTx(data, activeYear, activeMonth);
-  const total = sumTx(monthTx);
-  const count = monthTx.length;
+  const monthEntries = getMonthEntries(data, activeYear, activeMonth);
+  const total = sumList(monthEntries);
+  const count = monthEntries.length;
   const dim = daysInMonth(activeYear, activeMonth);
   const avg = total / dim;
 
@@ -289,70 +294,71 @@ function renderSummary(){
   statCount.textContent = String(count);
   statAvg.textContent = currency(avg);
 
-  const groups = groupByCategory(monthTx);
+  const groups = groupByBucket(monthEntries);
   const max = groups.length ? groups[0][1] : 0;
 
-  categoryBars.innerHTML = groups.length ? "" : `<div class="muted">No data yet for this month.</div>`;
+  bucketBars.innerHTML = groups.length ? "" : `<div class="muted">No data yet for this month.</div>`;
 
-  for (const [cat, val] of groups){
+  for (const [bucket, val] of groups){
     const pct = max ? (val / max) * 100 : 0;
-    const c = catColor(cat);
+    const c = bucketColor(bucket);
 
     const el = document.createElement("div");
     el.className = "bar";
     el.innerHTML = `
       <div class="bar-top">
-        <div><strong>${cat}</strong></div>
+        <div><strong>${escapeHtml(bucket)}</strong></div>
         <div>${currency(val)}</div>
       </div>
       <div class="bar-fill" style="width:${pct.toFixed(1)}%; --c:${c}"></div>
     `;
-    categoryBars.appendChild(el);
+    bucketBars.appendChild(el);
   }
 }
 
-function renderTransactions(){
-  const list = getFilteredTx();
+/* ---- Entries list ---- */
+function renderEntries(){
+  const list = getFilteredEntries();
 
-  const monthTx = getMonthTx(data, activeYear, activeMonth);
-  const monthTotal = sumTx(monthTx);
+  const monthEntries = getMonthEntries(data, activeYear, activeMonth);
+  const monthTotal = sumList(monthEntries);
 
   txListLabel.textContent = activeDayFilter
-    ? `${list.length} tx • ${activeDayFilter}`
-    : `${monthTx.length} tx • ${currency(monthTotal)}`;
+    ? `${list.length} entries • ${activeDayFilter}`
+    : `${monthEntries.length} entries • ${currency(monthTotal)}`;
 
   txList.innerHTML = "";
   if (!list.length){
     const empty = document.createElement("div");
     empty.className = "muted";
-    empty.textContent = "No transactions match your filters.";
+    empty.textContent = "No entries match your filters.";
     txList.appendChild(empty);
     return;
   }
 
-  for (const t of list){
+  for (const e of list){
     const row = document.createElement("div");
     row.className = "tx";
 
-    const c = catColor(t.category || "Other");
+    const c = bucketColor(e.bucket || "Other");
     row.innerHTML = `
       <div class="tx-left">
         <div class="tx-title">
           <span class="badge" style="--c:${c}">
-            <span class="badge-dot" style="background:${c}; box-shadow: 0 0 0 6px rgba(255,255,255,0.08), 0 0 18px rgba(0,0,0,0.25)"></span>
-            ${escapeHtml(t.category || "Other")}
+            <span class="badge-dot" style="background:${c}"></span>
+            ${escapeHtml(e.bucket || "Other")}
           </span>
         </div>
-        <div class="tx-sub">${t.date}${t.note ? " • " + escapeHtml(t.note) : ""}</div>
+        <div class="tx-sub">${e.date}${e.note ? " • " + escapeHtml(e.note) : ""}</div>
       </div>
       <div class="tx-right">
-        <div class="amount">${currency(t.amount)}</div>
+        <div class="amount">${currency(e.amount)}</div>
         <button class="del" title="Delete">Delete</button>
       </div>
     `;
 
     row.querySelector(".del").addEventListener("click", ()=>{
-      data.transactions = data.transactions.filter(x => x.id !== t.id);
+      data.entries = data.entries.filter(x => x.id !== e.id);
       saveData(data);
       renderAll();
     });
@@ -361,14 +367,14 @@ function renderTransactions(){
   }
 }
 
-/* Compare months */
+/* ---- Compare ---- */
 function renderCompare(){
-  const monthTx = getMonthTx(data, activeYear, activeMonth);
-  const totalThis = sumTx(monthTx);
+  const monthEntries = getMonthEntries(data, activeYear, activeMonth);
+  const totalThis = sumList(monthEntries);
 
   const otherMonth = Number(compareMonthSelect.value);
-  const otherTx = getMonthTx(data, activeYear, otherMonth);
-  const totalOther = sumTx(otherTx);
+  const otherEntries = getMonthEntries(data, activeYear, otherMonth);
+  const totalOther = sumList(otherEntries);
 
   compareThis.textContent = currency(totalThis);
   compareOther.textContent = currency(totalOther);
@@ -387,17 +393,17 @@ function renderCompare(){
   }
 }
 
-/* Main render */
+/* ---- Render all ---- */
 function renderAll(){
   setDefaultDateInput();
   updateFilterChip();
   renderCalendar();
   renderSummary();
   renderCompare();
-  renderTransactions();
+  renderEntries();
 }
 
-/* Events */
+/* ---- Events ---- */
 yearSelect.addEventListener("change", ()=>{
   activeYear = Number(yearSelect.value);
   activeDayFilter = null;
@@ -419,8 +425,8 @@ clearDayFilterBtn.addEventListener("click", ()=>{
   renderAll();
 });
 
-searchInput.addEventListener("input", renderTransactions);
-sortSelect.addEventListener("change", renderTransactions);
+searchInput.addEventListener("input", renderEntries);
+sortSelect.addEventListener("change", renderEntries);
 
 todayBtn.addEventListener("click", ()=>{
   const d = new Date();
@@ -431,23 +437,23 @@ todayBtn.addEventListener("click", ()=>{
   renderAll();
 });
 
-txForm.addEventListener("submit", (e)=>{
-  e.preventDefault();
+txForm.addEventListener("submit", (ev)=>{
+  ev.preventDefault();
 
   const date = txDate.value;
-  const category = txCategory.value;
+  const bucket = txBucket.value;
   const amount = Number(txAmount.value);
   const note = (txNote.value || "").trim();
 
-  if (!date || !category || !Number.isFinite(amount) || amount <= 0){
-    alert("Please enter a valid date, category, and amount.");
+  if (!date || !bucket || !Number.isFinite(amount) || amount <= 0){
+    alert("Please enter a valid date, bucket, and amount.");
     return;
   }
 
-  data.transactions.push({
+  data.entries.push({
     id: uid(),
     date,
-    category,
+    bucket,
     amount: Math.round(amount * 100) / 100,
     note
   });
@@ -467,12 +473,13 @@ txForm.addEventListener("submit", (e)=>{
   renderAll();
 });
 
+/* Export / Import */
 exportBtn.addEventListener("click", ()=>{
   const blob = new Blob([JSON.stringify(data, null, 2)], { type:"application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `budget-planner-backup-${new Date().toISOString().slice(0,10)}.json`;
+  a.download = `budget-planner-buckets-${new Date().toISOString().slice(0,10)}.json`;
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -485,22 +492,22 @@ importInput.addEventListener("change", async ()=>{
 
   const text = await file.text();
   const obj = safeParseJSON(text);
-  if (!obj || !obj.transactions || !Array.isArray(obj.transactions)){
+  if (!obj || !Array.isArray(obj.entries)){
     alert("That file doesn't look like a valid backup.");
     importInput.value = "";
     return;
   }
 
-  obj.transactions = obj.transactions
-    .filter(t => t && typeof t === "object")
-    .map(t => ({
-      id: t.id || uid(),
-      date: String(t.date || "").slice(0,10),
-      category: String(t.category || "Other"),
-      amount: Number(t.amount || 0),
-      note: String(t.note || "")
+  obj.entries = obj.entries
+    .filter(e => e && typeof e === "object")
+    .map(e => ({
+      id: e.id || uid(),
+      date: String(e.date || "").slice(0,10),
+      bucket: String(e.bucket || "Other"),
+      amount: Number(e.amount || 0),
+      note: String(e.note || "")
     }))
-    .filter(t => /^\d{4}-\d{2}-\d{2}$/.test(t.date) && Number.isFinite(t.amount) && t.amount >= 0);
+    .filter(e => /^\d{4}-\d{2}-\d{2}$/.test(e.date) && Number.isFinite(e.amount) && e.amount >= 0);
 
   data = obj;
   saveData(data);
@@ -508,10 +515,11 @@ importInput.addEventListener("change", async ()=>{
   importInput.value = "";
 });
 
+/* Reset */
 wipeBtn.addEventListener("click", ()=>{
   const ok = confirm("Reset will delete all saved data from this browser. Continue?");
   if (!ok) return;
-  data = { transactions: [] };
+  data = { entries: [] };
   saveData(data);
   activeDayFilter = null;
   renderAll();
